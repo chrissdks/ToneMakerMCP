@@ -2,7 +2,10 @@ import type { AmplitubeGear } from "../amplitube/types.js";
 import type { NormalizedTone } from "../tone3000/types.js";
 
 export type Workflow = "tone3000" | "amplitube" | "hybrid";
-export type DeliveryKind = "tone3000-preset" | "amplitube-instructions" | "amplitube-instructions-and-tone3000-ir";
+export type DeliveryKind =
+  | "tone3000-instructions"
+  | "amplitube-instructions"
+  | "amplitube-instructions-and-tone3000-ir";
 
 export interface RecommendationInput {
   target: string;

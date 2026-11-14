@@ -1,15 +1,7 @@
 # Third-party notices
 
-## TONE3000 Preset Builder
+Runtime libraries are distributed under their own package licenses. The lockfile records the exact dependency graph. MCP SDK and MCP Apps are official Model Context Protocol packages; React, Vite and other dependencies retain their respective upstream notices in node_modules when distributed.
 
-Guitar Tone Assistant delegates native `.t3kpreset` compilation and verification to [TONE3000 Preset Builder](https://github.com/tlennon-ie/Tone3000-PresetBuilder), included as a pinned Git submodule under `vendor/tone3000-preset-builder`.
+AmpliTube inventory facts are sourced from IK Multimedia's official gear inventory; TONE3000 creator names, descriptions and source URLs remain attached to returned captures. These trademarks and creator content belong to their owners.
 
-Copyright (c) 2026 Thomas Lennon
-
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+The external Thomas Lennon preset builder is no longer included or executed. Historical commits containing it retain its original MIT notice. No compiler source is part of this version.

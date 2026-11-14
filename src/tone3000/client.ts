@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { toneSchema, modelSchema, pageSchema } from "./schemas.js";
 import { TtlCache } from "./cache.js";
 import { Tone3000Error } from "./errors.js";
 import type {
@@ -30,7 +32,9 @@ export class Tone3000Client {
     return Boolean(this.options.secretKey);
   }
 
-  async searchTones(params: ToneSearchParams): Promise<PaginatedResponse<Tone3000Tone>> {
+  async searchTones(
+    params: ToneSearchParams,
+  ): Promise<PaginatedResponse<Tone3000Tone>> {
     const query = new URLSearchParams();
     if (params.query) query.set("query", params.query);
     query.set("page", String(params.page ?? 1));
@@ -40,30 +44,46 @@ export class Tone3000Client {
     if (params.sizes?.length) query.set("sizes", params.sizes.join("_"));
     if (params.tags?.length) query.set("tags", params.tags.join("_"));
     if (params.makes?.length) query.set("makes", params.makes.join("_"));
-    if (params.creators?.length) query.set("creators", params.creators.join(","));
+    if (params.creators?.length)
+      query.set("creators", params.creators.join(","));
     if (params.format) query.set("format", params.format);
     if (params.architecture) query.set("architecture", params.architecture);
     if (params.calibrated) query.set("calibrated", "true");
     if (params.verified) query.set("verified", "true");
 
-    return this.get<PaginatedResponse<Tone3000Tone>>(`/tones/search?${query.toString()}`);
+    return this.get<PaginatedResponse<Tone3000Tone>>(
+      `/tones/search?${query.toString()}`,
+      pageSchema(toneSchema),
+    );
   }
 
-  async getTone(id: number, architecture?: "1" | "2" | "custom"): Promise<Tone3000Tone> {
-    const suffix = architecture ? `?architecture=${encodeURIComponent(architecture)}` : "";
-    return this.get<Tone3000Tone>(`/tones/${id}${suffix}`);
+  async getTone(
+    id: number,
+    architecture?: "1" | "2" | "custom",
+  ): Promise<Tone3000Tone> {
+    const suffix = architecture
+      ? `?architecture=${encodeURIComponent(architecture)}`
+      : "";
+    return this.get<Tone3000Tone>(`/tones/${id}${suffix}`, toneSchema);
   }
 
   async listModels(
     toneId: number,
     architecture?: "1" | "2" | "custom",
   ): Promise<PaginatedResponse<Tone3000Model>> {
-    const query = new URLSearchParams({ tone_id: String(toneId), page: "1", page_size: "300" });
+    const query = new URLSearchParams({
+      tone_id: String(toneId),
+      page: "1",
+      page_size: "300",
+    });
     if (architecture) query.set("architecture", architecture);
-    return this.get<PaginatedResponse<Tone3000Model>>(`/models?${query.toString()}`);
+    return this.get<PaginatedResponse<Tone3000Model>>(
+      `/models?${query.toString()}`,
+      pageSchema(modelSchema),
+    );
   }
 
-  private async get<T>(path: string): Promise<T> {
+  private async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
     const token = this.options.secretKey;
     if (!token) {
       throw new Tone3000Error(
@@ -86,8 +106,14 @@ export class Tone3000Client {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {
-      const reason = error instanceof Error && error.name === "TimeoutError" ? "timed out" : "is unavailable";
-      throw new Tone3000Error(`The TONE3000 API ${reason}. Try again later.`, "unavailable");
+      const reason =
+        error instanceof Error && error.name === "TimeoutError"
+          ? "timed out"
+          : "is unavailable";
+      throw new Tone3000Error(
+        `The TONE3000 API ${reason}. Try again later.`,
+        "unavailable",
+      );
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -105,15 +131,21 @@ export class Tone3000Client {
       );
     }
     if (!response.ok) {
-      throw new Tone3000Error(`TONE3000 returned HTTP ${response.status}. Try again later.`, "unavailable");
+      throw new Tone3000Error(
+        `TONE3000 returned HTTP ${response.status}. Try again later.`,
+        "unavailable",
+      );
     }
 
     try {
-      const value = (await response.json()) as T;
+      const value = schema.parse(await response.json());
       this.cache.set(url, value);
       return value;
     } catch {
-      throw new Tone3000Error("TONE3000 returned an invalid JSON response.", "invalid_response");
+      throw new Tone3000Error(
+        "TONE3000 returned an invalid response format.",
+        "invalid_response",
+      );
     }
   }
 }

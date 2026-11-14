@@ -18,7 +18,7 @@ export type Tone3000Architecture = (typeof TONE3000_ARCHITECTURES)[number];
 export type Tone3000Sort = (typeof TONE3000_SORTS)[number];
 
 export interface EmbeddedUser {
-  id?: number;
+  id?: number | string;
   username?: string;
   display_name?: string | null;
   avatar_url?: string | null;
