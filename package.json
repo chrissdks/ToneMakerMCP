@@ -18,7 +18,9 @@
     "build:ui": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p ui/tsconfig.json",
     "dev:ui": "vite --host 127.0.0.1",
-    "test:browser": "node scripts/browser-check.mjs"
+    "test:browser": "node scripts/browser-check.mjs",
+    "eval:tones": "vitest run tests/recommendation-evals.test.ts",
+    "test:live": "node scripts/live-smoke.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

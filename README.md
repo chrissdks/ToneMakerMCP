@@ -69,6 +69,10 @@ TONE3000/NAM: download an accessible model through TONE3000 and load it in a com
 
 The catalog's inventory membership is sourced from IK's MAX v2 inventory. Detailed control/tone metadata is richer for the curated subset; unknown hardware mappings remain unknown. See the research evidence under docs/research.
 
+## Tone-quality evaluations
+
+Run `npm run eval:tones` for 24 deterministic checks of recommendation intent and signal-chain safety. These do not assess the sound: use the [listening evaluation guide](docs/EVALUATIONS.md) and [feedback template](docs/LISTENING_EVAL_TEMPLATE.md) to record real audition results. `npm run test:live` is a separate optional authenticated API smoke test. CI runs the deterministic checks without credentials.
+
 ## Development and limitations
 
 Commands: `npm run build`, `npm run build:server`, `npm run build:ui`, `npm run typecheck`, `npm test`, `npm run test:browser`, and `npm audit`.

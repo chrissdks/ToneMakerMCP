@@ -110,7 +110,14 @@ function recipeFor(
         "Tight closed-back 4x12, preferably a 5150/V30-family option; move the close mic outward if the top is scratchy.",
     };
   }
-  if (value.includes("fender") || value.includes("clean")) {
+  // A user-reported clean rhythm reference, not a claim about the session rig.
+  const cleanRhythmReference =
+    /\brock with you\b/.test(value) && /\bmichael jackson\b/.test(value);
+  if (
+    value.includes("fender") ||
+    value.includes("clean") ||
+    (cleanRhythmReference && (!desiredGain || desiredGain === "clean"))
+  ) {
     return {
       interpretation:
         "American-style clean: wide headroom, clear pick attack, an open cabinet, and restrained compression.",
