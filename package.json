@@ -1,32 +1,49 @@
 {
   "name": "guitar-tone-assistant",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "MCP tone-design assistant for TONE3000 presets and AmpliTube 5 MAX workflows",
+  "description": "MCP guitar tone discovery, manual signal-chain guidance, and optional interactive explorer",
   "type": "module",
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
     "dev:http": "tsx src/http.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:server && npm run build:ui",
     "start": "node dist/src/index.js",
     "start:http": "node dist/src/http.js",
     "catalog:build": "node scripts/build-amplitube-max-v2.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:server": "tsc -p tsconfig.json",
+    "build:ui": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p ui/tsconfig.json",
+    "dev:ui": "vite --host 127.0.0.1",
+    "test:browser": "node scripts/browser-check.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.6.1",
-    "zod": "^3.25.76"
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.10",
     "@types/node": "^22.18.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.10.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vite": "^6.4.6",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.1.0"
   }
 }

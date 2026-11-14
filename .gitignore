@@ -5,3 +5,7 @@ dist/
 coverage/
 *.log
 tmp/pdfs/
+
+__pycache__/
+playwright-report/
+test-results/

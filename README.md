@@ -1,343 +1,88 @@
 # Guitar Tone Assistant
 
-Guitar Tone Assistant is a local Model Context Protocol (MCP) server that helps a compatible AI assistant design and deliver practical guitar tones using the TONE3000 plugin, Neural Amp Modeler (NAM), cabinet impulse responses, and AmpliTube 5 MAX.
+A TypeScript MCP server for discovering TONE3000 captures, searching the 435-model AmpliTube 5 MAX v2 catalog, and assembling guitar signal chains manually. An optional React MCP App adds capture exploration, comparison, visual chains, and local rig editing.
 
-The MCP server is the **tone-design brain**. It interprets the player's goal and rig, chooses the most useful workflow, and can return either a ready-to-load TONE3000 plugin preset, AmpliTube build instructions, or an adjustable AmpliTube amp paired with a TONE3000 cabinet IR. It does not process guitar audio itself.
+It does not listen to audio, match recordings, control a DAW, or generate preset files. Artist references and knob values are heuristic starting points; audition with your guitar and monitoring equipment.
 
-> [!IMPORTANT]
-> This repository is an early local MVP. Use the stdio transport on a trusted computer. The HTTP transport binds to loopback by default but has no caller authentication, so it must not be exposed through a public tunnel, shared network, or public deployment.
+## Setup
 
-## What it can and cannot do
+Requirements: Node.js 22.12+ and npm. No Python or Git submodule is required to build or run. Optional catalog research scripts still use Python; they are not part of runtime setup.
 
-Guitar Tone Assistant can:
+1. Run `npm ci`.
+2. Copy `.env.example` to `.env`.
+3. Generate a server secret at [TONE3000 settings](https://www.tone3000.com/settings) and set `TONE3000_SECRET_KEY`. Keep this file private. The publishable key is used for future OAuth integrations, not this local server-secret flow.
+4. Run `npm run build` and `npm test`.
 
-- Search live TONE3000 tone packs and cabinet IRs when an API credential is configured.
-- Explain whether a capture includes an amp, an amp and cabinet, or only a cabinet IR.
-- Decide between TONE3000-plugin, AmpliTube-only, and hybrid delivery based on the player's software and priorities.
-- Compile exact selected TONE3000 tone/model IDs into a verified native `.t3kpreset` file.
-- Return a local file path over stdio or a localhost download link over the HTTP transport.
-- Search the complete, versioned 435-model AmpliTube 5 MAX v2 inventory, with richer tone-design metadata for the core recommendation set.
-- Suggest starting settings and adjust them for guitar, pickup type, and tuning.
-- Troubleshoot fizz, mud, harshness, boom, thinness, excessive compression, and weak pick attack.
-- Compare two to four TONE3000 captures.
-- Store an optional local description of the user's rig.
+Without a key, the local AmpliTube search and troubleshooting work; live tools report missing credentials. Recommendations can still provide offline guidance.
 
-It does **not**:
+## Run and connect
 
-- Listen to, analyze, transform, or play guitar audio.
-- Load, install, or execute the generated preset or model files for the user.
-- Control a DAW or AmpliTube.
-- Create AmpliTube preset files.
-- Reproduce a recorded artist tone exactly.
-- Automatically apply a saved user profile to every recommendation.
+Stdio: `npm start` (or `npm run dev` for source development). An MCP host starts this process on demand; it is not a web page or permanent Windows service.
 
-Artist and album references are treated as useful starting points, not claims about exact studio equipment or settings.
-
-## Who this is for
-
-The current MVP is aimed at guitarists who already use, or want to experiment with:
-
-- [TONE3000](https://www.tone3000.com/) for NAM captures and impulse responses.
-- The official [TONE3000 plugin](https://www.tone3000.com/guides/tone3000-plugin) for ready-to-load multi-block presets, or another NAM-compatible player for manual chains.
-- AmpliTube 5 MAX for adjustable amp, cabinet, microphone, and effects chains.
-- A DAW or plugin host capable of arranging multiple plugins.
-- ChatGPT desktop, Codex CLI, the Codex IDE extension, or another MCP client.
-
-Developers can also use the project as a starting point for a more complete guitar-tone MCP server.
-
-## The routing concepts that matter
-
-| Result | What it represents | What normally follows it |
-| --- | --- | --- |
-| `amp` NAM capture | A fixed snapshot of an amplifier without cabinet coloration | Cabinet simulator or IR loader |
-| `amp-cab` NAM capture | A fixed snapshot containing both amplifier and cabinet coloration | Post-EQ, delay, or reverb; no additional cab by default |
-| `ir` or cabinet result | Cabinet and microphone coloration | Use after an amp-only NAM capture or amp simulation |
-| AmpliTube amp model | A continuously adjustable amp simulation | AmpliTube cabinet/microphone section or another compatible cab stage |
-
-Applying a cabinet to an `amp-cab` capture usually creates a muffled or phase-heavy **double-cab** sound. The server calls out this risk when the TONE3000 metadata is clear enough.
-
-NAM captures are fixed snapshots. Turning a post-EQ control is not the same as changing the captured amplifier's original gain, tone stack, or master volume.
-
-## How to use the three workflows
-
-### TONE3000-focused
-
-The assistant selects exact TONE3000 tone/model IDs and can ask the bundled compiler adapter to produce a native `.t3kpreset` file. The user then loads that file in the TONE3000 plugin. A typical internal chain is:
-
-```text
-Guitar -> Audio interface -> TONE3000 plugin
-  [Gate/boost as captured or hosted] -> Amp capture -> Cab/IR when required -> Tone EQ
-```
-
-If the selected capture is `amp-cab`, the assistant skips a separate cabinet by default to avoid double-cab coloration. Preset compilation requires exact TONE3000 IDs; recommendations remain separate from compilation so the assistant can explain the choice before creating a file.
-
-### AmpliTube-only
-
-Typical chain inside AmpliTube:
-
-```text
-Guitar -> Gate/boost -> AmpliTube amp -> AmpliTube cabinet and microphones -> Rack effects
-```
-
-This workflow offers continuously adjustable amp controls and does not require a NAM player.
-
-### Hybrid
-
-The default hybrid keeps AmpliTube's amp controls adjustable while using a TONE3000 cabinet IR in AmpliTube's IR Loader:
-
-```text
-Guitar -> AmpliTube gate/boost -> AmpliTube amp
--> AmpliTube IR Loader with a TONE3000 .wav cabinet IR
--> AmpliTube post-EQ, delay, and reverb
-```
-
-Disable AmpliTube's normal cabinet block while the external IR is active. A NAM amp capture is not an impulse response and cannot be loaded into the IR Loader. More advanced multi-plugin NAM/AmpliTube routing is still possible, but it is no longer what `hybrid` means by default.
-
-## Example requests
-
-- “Find a tight 5150-style TONE3000 amp capture and pair it with a cabinet IR.”
-- “Give me a TONE3000-only, AmpliTube-only, and hybrid version of this tone.”
-- “Choose the best TONE3000 captures, then create a mono preset I can load in the plugin.”
-- “I use a Les Paul with humbuckers in Drop C. Give me a modern metal starting point.”
-- “This amp-and-cab capture sounds fizzy through my current chain. What should I change first?”
-- “Compare these three TONE3000 links and tell me which one is most flexible.”
-- “Give me a clean American combo-style tone.”
-
-The returned knob values are starting points on a 0–10 scale. They are not guaranteed to match the labels or ranges of every physical or AmpliTube model.
-
-## Included MCP tools
-
-| Tool | Purpose |
-| --- | --- |
-| `search_tone3000` | Search and rank live TONE3000 tone packs with direct page links. |
-| `get_tone3000_tone` | Resolve an ID or URL, classify the capture, and list model metadata and download URLs. |
-| `search_tone3000_cabs` | Find cabinet IRs by speaker, size, and character. |
-| `search_amplitube_gear` | Search and paginate through all 435 official AmpliTube 5 MAX v2 entries by category, name, alias, hardware basis, and curated tone metadata. |
-| `recommend_tone_chain` | Choose a primary delivery workflow and return the relevant TONE3000, AmpliTube, and hybrid approaches. |
-| `create_tone3000_plugin_preset` | Compile exact selected tone/model IDs into a verified `.t3kpreset` using the attributed external builder. |
-| `troubleshoot_tone` | Give prioritized changes for common tone problems. |
-| `compare_tones` | Compare capture requirements, gain/EQ clues, flexibility, and likely uses. |
-| `get_user_tone_profile` | Read an optional local rig profile. |
-| `save_user_tone_profile` | Replace an optional local rig profile. |
-
-Every tool has Zod input/output schemas and MCP annotations. The schemas describe the tool contract; the current TONE3000 client does not yet perform full runtime validation of every upstream response.
-
-## Requirements
-
-- Node.js 20 or newer.
-- npm.
-- Git with submodule support.
-- Python 3.8 or newer for native TONE3000 preset compilation.
-- A compatible MCP client.
-- A TONE3000 account and secret key for live TONE3000 tools.
-- A NAM-compatible player and DAW/plugin host to use downloaded NAM models.
-- AmpliTube 5 MAX only if you want to build the suggested AmpliTube chains.
-
-Local AmpliTube search, recommendations, and troubleshooting can work without a TONE3000 credential. Live TONE3000 tools will return a configuration error, and recommendations will state that live candidates are unavailable.
-
-## Install and verify
-
-```powershell
-git submodule update --init --recursive
-npm install
-Copy-Item .env.example .env
-```
-
-Open [TONE3000 settings](https://www.tone3000.com/settings), generate API credentials, and put the **secret key** in `.env`:
-
-```dotenv
-TONE3000_SECRET_KEY=t3k_cs_replace_me
-```
-
-The secret key is a server-only Bearer credential. Never place it in browser code, a public repository, MCP tool output, logs, or a publicly reachable server.
-
-Build and run the automated tests:
-
-```powershell
-npm run build
-npm test
-```
-
-If the submodule is missing, discovery and recommendation tools still build, but `create_tone3000_plugin_preset` returns a setup error until the builder is initialized.
-
-## Native TONE3000 preset delivery
-
-`create_tone3000_plugin_preset` is intentionally a write tool: it creates a recipe and one or more preset artifacts under `.cache/generated-presets`. Discovery, recommendation, comparison, and troubleshooting tools remain read-only.
-
-The tool accepts exact tone IDs and optional model-name regular expressions. It delegates compilation to the pinned external builder, checks the `T3KB` file signature, runs the builder's verifier, and only then returns the artifact. The current TONE3000 server credential is passed through the child process environment and is never placed on the command line or in tool output.
-
-Presentation depends on the MCP transport:
-
-- **Stdio:** the tool returns the absolute local path to each `.t3kpreset` file.
-- **HTTP:** it also returns a link such as `http://127.0.0.1:8787/presets/{artifactId}/{fileName}`. That link is available only while the local HTTP server is running and only from the same computer by default.
-
-The output folder can be changed with `PRESET_OUTPUT_PATH`. The server creates files but does not copy them into the TONE3000 plugin's preset directory or open the plugin.
-
-## Run locally with stdio
-
-Stdio is the recommended transport for this MVP because it does not open a network listener:
-
-```powershell
-npm run build
-node dist/src/index.js
-```
-
-### Connect to Codex or ChatGPT desktop
-
-Codex CLI, the Codex IDE extension, and ChatGPT desktop can use locally configured MCP servers. Add the built stdio server with the CLI:
-
-```powershell
-codex mcp add guitar-tone-assistant --env TONE3000_SECRET_KEY=t3k_cs_replace_me -- node C:\absolute\path\to\Tone3000mcp\dist\src\index.js
-```
-
-Alternatively, create a project-scoped `.codex/config.toml` in a trusted project:
+Example host configuration; replace the paths:
 
 ```toml
 [mcp_servers.guitar-tone-assistant]
 command = "node"
-args = ["C:/absolute/path/to/Tone3000mcp/dist/src/index.js"]
-cwd = "C:/absolute/path/to/Tone3000mcp"
-env_vars = ["TONE3000_SECRET_KEY"]
+args = ["C:/path/tone3000mcp/dist/src/index.js"]
+cwd = "C:/path/tone3000mcp"
 ```
 
-Do not put the secret value directly in `config.toml`; forward it from the local environment. Run `codex mcp list` or enter `/mcp` in a supported client to verify the connection.
+The working directory lets dotenv load the ignored local credential file. Restart the host after changing the build or configuration. Regular Chat does not automatically inherit a local host configuration; connecting a hosted Chat client is a separate integration.
 
-See the official [ChatGPT and Codex MCP configuration guide](https://learn.chatgpt.com/docs/extend/mcp) for current client instructions.
+Local HTTP: `npm run start:http` exposes `http://127.0.0.1:8787/mcp`; health is `GET /`. The transport is stateless POST. Non-loopback startup and cross-origin browser requests are rejected. It has no caller identity and must not be tunneled or publicly exposed.
 
-## HTTP transport: local development only
+## Interactive MCP App
 
-The repository also includes a stateless Streamable HTTP transport:
+Ask a compatible host to **open Tone Explorer** (`open_tone_explorer`). It reads `ui://guitar-tone-assistant/explorer.html`, bundled as one HTML resource with no remote assets. The View uses the official MCP Apps host bridge to invoke data tools. It never receives an API secret.
 
-```powershell
-npm run build
-node dist/src/http.js
-```
+Search captures, inspect model metadata, select 2–4 captures for comparison, request one of three manual workflows, and load/edit the default local rig. Source-page buttons use the host's link-opening capability. Missing host capabilities disable interactions with a text fallback. `npm run dev:ui` is a layout preview; a normal browser alone does not supply the host bridge.
 
-The endpoint is `http://127.0.0.1:8787/mcp`, and `GET /` returns a credential-safe health response. It can be inspected locally with:
+External ChatGPT/Claude host rendering has not been manually verified in this iteration. Automated tests cover the bridge wrapper, and a local browser harness validates the official bridge independently of any product account. See [development](docs/DEVELOPMENT.md) for manual host acceptance steps.
 
-```powershell
-npx @modelcontextprotocol/inspector@latest
-```
+![Tone Explorer showing capture search, comparison selection, and manual signal-chain guidance](docs/images/tone-explorer.png)
 
-Select Streamable HTTP and enter `http://127.0.0.1:8787/mcp`.
+_Verified local MCP Apps browser harness. This screenshot demonstrates the interface; it does not establish external ChatGPT host compatibility._
 
-> [!WARNING]
-> The HTTP implementation binds to `127.0.0.1` by default and does not emit a wildcard CORS origin. It still has no MCP caller authentication and exposes local profile and preset-creation tools. Do not change `HOST`, expose it with a tunnel or port forwarding, or deploy it publicly without adding authentication and authorization.
+## Tools
 
-A shareable or published version must first authenticate MCP callers, verify authorization on every request, restrict its network and CORS policy, and replace the single shared TONE3000 credential with an appropriate per-user flow. OpenAI documents OAuth 2.1 as the expected authorization pattern for authenticated plugin MCP servers: [OpenAI MCP authentication](https://developers.openai.com/plugins/build/auth).
+| Tool                   | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| search_tone3000        | Live search and metadata ranking                       |
+| get_tone3000_tone      | Capture classification and model metadata              |
+| search_tone3000_cabs   | Cabinet IR discovery                                   |
+| search_amplitube_gear  | Offline versioned gear catalog                         |
+| recommend_tone_chain   | Explain manual TONE3000, AmpliTube, or hybrid assembly |
+| compare_tones          | Compare 2–4 capture IDs or official URLs               |
+| troubleshoot_tone      | Prioritized routing and tone adjustments               |
+| get_user_tone_profile  | Read a local rig                                       |
+| save_user_tone_profile | Replace a local rig                                    |
+| open_tone_explorer     | Launch optional interactive View                       |
 
-## TONE3000 API behavior and publishing constraints
+Examples: “Find clean amp-only captures.” “Compare these three tone links.” “Recommend an AmpliTube clean rhythm chain for single coils.” “My amp+cab capture sounds muffled through another cabinet.”
 
-Verified against the official documentation on 2026-09-07:
+## Signal-chain rules
 
-- API v1 base: `https://www.tone3000.com/api/v1`.
-- A secret key is a server-only Bearer credential.
-- User-facing integrations should use OAuth 2.0 with PKCE.
-- Search uses `GET /tones/search`; detail uses `GET /tones/{id}`; models use `GET /models?tone_id={id}`.
-- A tone's API-provided `url` is returned rather than guessing a public page route.
-- Model `model_url` downloads require the Bearer credential.
-- The default limit is 100 requests per minute, while search is more heavily restricted.
-- TONE3000 recommends its Select OAuth flow for production browsing.
-- Free and commercial integrations have different endpoint and review requirements.
+An amp-only NAM capture is a fixed amp snapshot and needs one cabinet/IR stage. An amp+cab capture already includes cabinet coloration: adding another cab often produces a muffled sound. Cabinet IRs color an amp output and do not replace the amp. A NAM amp model cannot go in an IR loader.
 
-Review the current [TONE3000 API documentation, design requirements, and commercial terms](https://www.tone3000.com/api) before publishing or monetizing an integration. The current global-secret search implementation is intended for trusted local evaluation, not a shared public service.
+TONE3000/NAM: download an accessible model through TONE3000 and load it in a compatible player; add a cab only when needed. AmpliTube: assemble the suggested amp/cab/effects manually and use only controls actually present on that model. Hybrid: AmpliTube amp → TONE3000 WAV cabinet IR in a compatible IR loader → post effects; disable the regular cabinet stage. Generic knob values do not imply every catalog model has those controls.
 
-## Preset Builder credit and update model
+The catalog's inventory membership is sourced from IK's MAX v2 inventory. Detailed control/tone metadata is richer for the curated subset; unknown hardware mappings remain unknown. See the research evidence under docs/research.
 
-Native `.t3kpreset` compilation is powered by [TONE3000 Preset Builder](https://github.com/tlennon-ie/Tone3000-PresetBuilder), created by **Thomas Lennon** and licensed under the MIT License. It is included as a Git submodule at `vendor/tone3000-preset-builder`, currently pinned to commit `0862e02f772657e4203d3f98164d851dc0ff63a0`. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the builder's own license file for the full notice.
+## Development and limitations
 
-No compiler source was copied into this project. `src/preset-builder/client.ts` is a narrow adapter around the builder's public command-line interface. This separation means upstream fixes can be adopted by changing the Git submodule reference instead of copying files:
+Commands: `npm run build`, `npm run build:server`, `npm run build:ui`, `npm run typecheck`, `npm test`, `npm run test:browser`, and `npm audit`.
 
-```powershell
-git -C vendor/tone3000-preset-builder fetch origin
-git -C vendor/tone3000-preset-builder checkout <reviewed-commit-or-tag>
-git add vendor/tone3000-preset-builder
-npm run build
-npm test
-```
+Verification for this revision: backend/UI builds and typecheck passed, all 41 automated tests passed, and the installed-Chrome browser harness passed. The harness checks the official host bridge, initial tool data, real backend calls, narrow layouts, and painted screenshot content so a blank raster cannot silently pass. `npm run test:browser` requires Google Chrome installed and a completed `npm run build`. Screenshots are saved under `.cache/browser-checks/`.
 
-Review upstream changes and test generated files before advancing the pin. Consumers receive the reviewed version with `git submodule update --init --recursive`; they do not silently track the builder's latest branch.
+API responses are validated before caching. Requests time out and surface 401/403/429/5xx safely without automatic retry storms. Profiles validate data, reject reserved IDs and serialize atomic writes within one process; multiple processes must not share a writable file. Saved profiles influence View recommendations after loading; ordinary recommendation callers must pass their rig explicitly.
 
-## AmpliTube catalog scope
+Preset generation was removed in 0.3.0, including its compiler, gitlink, Python adapter, environment options and download route. `deliveryKind: tone3000-preset` became `tone3000-instructions`; other core tool names are retained. Existing user-generated files were preserved outside the runtime.
 
-The runtime catalog at [`src/data/amplitube5max.json`](src/data/amplitube5max.json) contains all **435 models** in IK Multimedia's AmpliTube 5 MAX v2 inventory, document version **5.10.4**, updated **2025-03-27**:
+- [Architecture audit](docs/ARCHITECTURE_AUDIT.md)
+- [Architecture and protocol diagrams](docs/ARCHITECTURE.md)
+- [Development and verification](docs/DEVELOPMENT.md)
+- [Deployment requirements and blockers](docs/DEPLOYMENT.md)
+- [Execution checklist](docs/IMPLEMENTATION_PLAN.md)
 
-| Category | Count |
-| --- | ---: |
-| Stomp | 111 |
-| Amp | 111 |
-| Cabinet | 106 |
-| Speaker | 33 |
-| Microphone | 18 |
-| Rack | 48 |
-| Room | 8 |
-
-Official membership comes from IK's [AmpliTube 5 MAX v2 gear inventory](https://www.ikmultimedia.com/products/include/at5/gear_list_pdf/AmpliTube_5_MAX_v5.10.4_gear.pdf). Every runtime record carries the inventory version, source URL, category, and PDF page. The source-only extraction is stored in [`docs/research/amplitube-max-v2-inventory.json`](docs/research/amplitube-max-v2-inventory.json).
-
-The v2 catalog was reconciled against the earlier 420-item research rather than replacing it blindly. The reconciliation matched 417 records, added 18, removed 3, and identified 3 renames. See [`docs/research/amplitube-max-v2-reconciliation.json`](docs/research/amplitube-max-v2-reconciliation.json) and the earlier evidence set:
-
-- [`docs/research/amplitube-max-cross-reference.md`](docs/research/amplitube-max-cross-reference.md)
-- [`docs/research/amplitube-max-cross-reference.json`](docs/research/amplitube-max-cross-reference.json)
-
-Inventory coverage and tone-depth coverage are deliberately distinguished. All 435 models are searchable, and 315 currently have a researched hardware basis. Detailed control lists, gain classifications, styles, and hand-tuned pairings are richer for the 19-record core recommendation set preserved in [`src/data/amplitube5max.curated.json`](src/data/amplitube5max.curated.json). Empty tonal fields mean “not curated yet,” not “the model has no controls or uses.” Mapping states such as `inferred`, `not-stated`, and `unresolved` must not be presented as official hardware identities.
-
-To rebuild after reviewing a newer official inventory, extract its factual name list and regenerate the merged catalog:
-
-```powershell
-python scripts/extract-amplitube-inventory.py <official-inventory.pdf> docs/research/amplitube-max-v2-inventory.json
-npm run catalog:build
-npm run build
-npm test
-```
-
-Official product reference: [IK Multimedia AmpliTube 5](https://www.ikmultimedia.com/products/amplitube5/).
-
-## User profiles
-
-Profiles are optional local JSON records for guitars, pickups, tunings, interface, favorite amps/IRs, AmpliTube ownership, and monitoring equipment.
-
-Saving a profile does not automatically cause `recommend_tone_chain` to load it. An MCP client must currently read the profile and pass relevant guitar, pickup, tuning, or workflow information into a recommendation request.
-
-The profile store is designed for one trusted local process. It is not suitable for concurrent or multi-user hosting.
-
-## Project structure
-
-```text
-src/index.ts                    stdio entry point
-src/http.ts                     Streamable HTTP development entry point
-src/server.ts                   MCP tool definitions and schemas
-src/tone3000/                   TONE3000 API client, types, cache, and normalization
-src/amplitube/                  Local AmpliTube search and types
-src/recommendation/             Recommendation, comparison, and troubleshooting rules
-src/preset-builder/             Adapter and types for the external preset compiler
-src/profile/                    Local profile storage
-src/data/amplitube5max.json     Generated 435-record MAX v2 runtime catalog
-src/data/amplitube5max.curated.json Rich metadata for the core recommendation set
-tests/                          Automated unit tests
-docs/research/                  Catalog research and repository review notes
-scripts/                        Repeatable inventory extraction and catalog merge
-vendor/tone3000-preset-builder/ Pinned external compiler Git submodule
-```
-
-The service is intentionally modular: TONE3000 access is isolated from the recommendation engine, and another gear platform can be added alongside `src/amplitube`.
-
-## Current limitations and roadmap
-
-The main work required before a public release is:
-
-1. Add MCP caller authentication and authorization for non-local use.
-2. Implement TONE3000 per-user OAuth/Select rather than sharing one server credential.
-3. Validate all upstream API responses before caching or processing them.
-4. Make profile storage safe for reserved IDs and concurrent writes.
-5. Enrich the full AmpliTube catalog with each model's real control names, ranges, channels, modes, and collection ownership metadata.
-6. Generate settings from those model-specific controls instead of the shared starter control vocabulary.
-7. Make saved profiles influence recommendations automatically.
-8. Add DAW- and NAM-player-aware routing instructions.
-9. Add an explicit preview/confirmation step that converts a recommendation into a preset recipe automatically.
-10. Add HTTP, malformed-response, profile-concurrency, and catalog-update tests.
-
-For detailed review evidence, see [`docs/research/code-review-2026-09-07.md`](docs/research/code-review-2026-09-07.md).
-
-## Status
-
-This repository is suitable for local experimentation and MCP development and now has authoritative, versioned inventory coverage of AmpliTube 5 MAX v2. It is not currently suitable for anonymous public hosting, multi-user profile storage, or model-perfect instructions for every control on all 435 models.
+Local experimentation is supported. Shared hosting requires caller authentication, per-user TONE3000 OAuth, profile isolation, and policy review before deployment.
